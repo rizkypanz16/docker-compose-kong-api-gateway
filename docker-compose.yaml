@@ -1,0 +1,69 @@
+networks:
+  kong-network:
+    name: kong-network
+
+services:
+  kong-postgres-database:
+    image: postgres:latest
+    container_name: kong-postgres-database
+    networks:
+      - kong-network
+    ports:
+      - "5432:5432"
+    volumes:
+      - ${HOME}/kong/volumes/kong-postgres-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=kong
+      - POSTGRES_USER=kong
+      - POSTGRES_PASSWORD=kong
+    restart: unless-stopped
+
+  kong-migrations-bootstrap:
+    image: kong:latest
+    container_name: kong-migrations-bootstrap
+    command: kong migrations bootstrap && kong migrations up && kong migrations finish
+    networks:
+      - kong-network
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-postgres-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    depends_on:
+      - kong-postgres-database
+    restart: on-failure
+
+  kong-migrations-up:
+    image: kong:latest
+    container_name: kong-migrations-up
+    command: kong migrations up && kong migrations finish
+    networks:
+      - kong-network
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-postgres-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    depends_on:
+      - kong-postgres-database
+    restart: on-failure
+
+  kong:
+    image: kong:latest
+    container_name: kong
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-postgres-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    networks:
+      - kong-network
+    ports:
+      - 8000:8000
+      - 8001:8001
+    depends_on:
+      - kong-postgres-database
+    restart: unless-stopped
+
